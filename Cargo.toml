@@ -1,0 +1,97 @@
+# --- Package metadata ---
+[package]
+# The crate name becomes the produced binary name, so users can run `inference-server` directly.
+name = "inference-server"
+# We use a conventional semantic version because Cargo expects a version for published-quality crates.
+version = "0.1.0"
+# Rust 2021 keeps the syntax modern without requiring unstable features.
+edition = "2021"
+
+# --- Binary target ---
+[[bin]]
+# The binary name matches the package name so the release artifact is predictable.
+name = "inference-server"
+# The binary entry point lives in `src/main.rs`, which is Cargo's conventional location.
+path = "src/main.rs"
+
+# --- Dependencies ---
+[dependencies]
+# `anyhow` gives the binary a simple error type for top-level startup and shutdown plumbing.
+# We choose it over hand-writing nested `Box<dyn Error>` types because startup code benefits from concise error context.
+anyhow = "=1.0.102"
+
+# `axum` is the HTTP framework that sits on top of Hyper and Tower.
+# We enable `json` because our API speaks JSON, `tokio` because we use `axum::serve`,
+# and `http1` because the example server targets standard REST clients.
+axum = { version = "=0.7.9", features = ["http1", "json", "tokio"] }
+
+# `config` merges files and environment variables into one strongly typed struct.
+# We only enable TOML support because this project reads `default.toml` plus environment overrides, and the broader default parser set pulls in unnecessary transitive crates.
+config = { version = "=0.13.4", default-features = false, features = ["toml"] }
+
+# `metrics` is a facade crate: our library code emits counters and histograms without hard-coding an exporter.
+metrics = "=0.22.3"
+
+# `metrics-exporter-prometheus` installs a Prometheus-compatible recorder and gives us a handle to render `/metrics`.
+# We use the default HTTP-listener-capable build even though we render manually because it keeps the API surface familiar.
+metrics-exporter-prometheus = "=0.13.1"
+
+# `ndarray` gives us a safe tensor-like container for token IDs and attention masks.
+# We intentionally stay on the 0.15 line from the requirements table.
+ndarray = "=0.15.6"
+
+# `ort` is the safe Rust binding for ONNX Runtime.
+# We pin to `2.0.0-rc.9` because it still provides the 2.x API surface while remaining compatible with the Rust 1.75 toolchain in this environment.
+# We disable default features and enable `load-dynamic` so the crate compiles without statically linking ONNX Runtime.
+ort = { version = "=2.0.0-rc.9", default-features = false, features = ["load-dynamic"] }
+
+# `serde` powers both configuration deserialization and JSON request/response serialization.
+# The `derive` feature removes repetitive manual implementations.
+serde = { version = "=1.0.228", features = ["derive"] }
+
+# `serde_json` gives us direct JSON value construction for error bodies and examples.
+serde_json = "=1.0.149"
+
+# `thiserror` keeps our custom error enum readable and avoids manual `Display` implementations.
+thiserror = "=1.0.69"
+
+# `tokenizers` loads a real Hugging Face tokenizer for the ONNX model path.
+# We disable default features because they pull in the optional CLI stack (`clap`), which we do not need on the server side.
+# The `onig` feature keeps the regex implementation used by common tokenizer JSON files.
+tokenizers = { version = "=0.15.2", default-features = false, features = ["onig"] }
+
+# `tokio` is the async runtime: it drives the HTTP server, channels, timers, and spawned tasks.
+# We enable `full` because this project uses several Tokio subsystems at once, and `test-util` so paused-time unit tests compile.
+tokio = { version = "=1.52.3", features = ["full", "test-util"] }
+
+# `tower` supplies middleware building blocks such as timeouts and service helpers.
+# The `timeout` feature supports request deadlines, and `util` is handy in tests and layers.
+tower = { version = "=0.4.13", features = ["timeout", "util"] }
+
+# `tower-http` adds HTTP-oriented middleware.
+# We use `trace` for request tracing and keep the feature list narrow to reduce compile time.
+tower-http = { version = "=0.5.2", features = ["trace"] }
+
+# `tracing` is our structured logging facade.
+tracing = "=0.1.44"
+
+# `tracing-subscriber` formats logs and reads filters from the environment.
+# We enable `env-filter` for runtime log-level control and `json` so logs are machine-readable.
+tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json"] }
+
+# `uuid` generates request IDs that are easy to trace across logs and responses.
+# We pin to `1.12.1` because it stays within the requested 1.x line while remaining compatible with Rust 1.75 in this environment.
+# The `v4` feature enables random UUID generation, and `serde` lets IDs serialize cleanly in JSON payloads.
+uuid = { version = "=1.12.1", features = ["serde", "v4"] }
+
+[dev-dependencies]
+# `reqwest` is only used by integration and load tests.
+# We use `rustls-tls` instead of the default native TLS backend to avoid pulling in OpenSSL-specific dependencies that are unnecessary in this repo.
+reqwest = { version = "=0.11.27", default-features = false, features = ["json", "rustls-tls"] }
+
+# --- Build profiles ---
+[profile.release]
+# `lto = true` lets LLVM optimize across crate boundaries, which is useful in latency-sensitive binaries.
+lto = true
+# A single codegen unit trades slower compile times for better optimized machine code.
+codegen-units = 1
