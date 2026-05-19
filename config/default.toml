@@ -1,0 +1,48 @@
+# --- Server network settings ---
+[server]
+# Bind to all interfaces so local Docker runs and Kubernetes pods behave the same way.
+host = "0.0.0.0"
+# Port 3000 is a common default for local HTTP services.
+port = 3000
+# Cap request bodies so a single oversized payload cannot exhaust memory.
+max_payload_bytes = 16384
+# Time out slow requests so stuck clients do not consume resources forever.
+request_timeout_ms = 5000
+# Allow a short drain period on shutdown so in-flight requests can finish cleanly.
+shutdown_grace_period_ms = 10000
+
+# --- Queue settings ---
+[queue]
+# Run two model executions concurrently by default.
+worker_count = 2
+# Allow up to sixteen additional requests to wait in the queue.
+queue_capacity = 16
+# Wait briefly for a queue slot before returning `503 Service Unavailable`.
+enqueue_timeout_ms = 25
+
+# --- Model settings ---
+[model]
+# The default backend is `mock` so the server runs out of the box without an ONNX model download.
+backend = "mock"
+# These paths are used when `backend = "onnx"`.
+model_path = "models/distilbert-sst2/model.onnx"
+tokenizer_path = "models/distilbert-sst2/tokenizer.json"
+# Metadata is returned by `/v1/info` and attached to metrics labels.
+name = "distilbert-sst2"
+version = "1"
+# Labels match the SST-2 sentiment model.
+labels = ["NEGATIVE", "POSITIVE"]
+
+# --- Pipeline settings ---
+[pipeline]
+# DistilBERT models commonly use a 512-token window.
+max_tokens = 512
+# Cap raw input characters before tokenization as a cheap first-line validation.
+max_characters = 4096
+
+# --- Logging settings ---
+[logging]
+# Default to INFO so the server is observable without being noisy.
+level = "info"
+# Emit JSON logs for production-friendly structured ingestion.
+json = true
